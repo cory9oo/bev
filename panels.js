@@ -311,3 +311,127 @@ function feedPanel(id, feed, fields, note) {
   if (feed.generated) h.appendChild(el('div', 'sub', 'as of ' + feed.generated));
   if (feed.source) h.appendChild(srcLine(feed.source));
 }
+
+/* ================================================================ S5 · THE 13 DOMAINS */
+
+/* ALL THIRTEEN, ids fixed and never renumbered (DEC-001).  One card per domain
+   in the square grid; on a phone one column, equal widths.  Every count on a
+   card is read straight off board.json - the card computes nothing, so a number
+   here and a number in the machine panel cannot disagree. */
+function renderDomains() {
+  var B = S.board;
+  var h = clear(body('p-domains'));
+
+  var grid = el('div', 'grid');
+  grid.style.gridTemplateColumns = 'repeat(12, 1fr)';
+  B.domains.forEach(function (d) {
+    var card = el('div', 'panel domcard c3');
+    card.style.cursor = 'pointer';
+    card.style.background = 'var(--surface)';
+
+    var top = el('div');
+    top.appendChild(el('span', 'lbl', d.id + '  ' + d.name));
+    card.appendChild(top);
+
+    var pct = d.score.pct;
+    var num = el('div', 'num sm ' + rampClass(pct));
+    num.textContent = em(pct, '%');
+    card.appendChild(num);
+    var bar = el('div', 'bar');
+    var fill = el('i');
+    fill.style.width = (pct === null || pct === undefined ? 0 : pct) + '%';
+    fill.style.background = rampVar(pct);
+    bar.appendChild(fill);
+    card.appendChild(bar);
+
+    var dl = el('dl', 'kv');
+    function kv(k, v, cls) {
+      dl.appendChild(el('dt', null, k));
+      var dd = el('dd', cls);
+      if (v && v.nodeType !== undefined) dd.appendChild(v); else dd.appendChild(dash(v));
+      dl.appendChild(dd);
+    }
+    kv('LB', d.lb.total + '  (A ' + d.lb.A + ' · D ' + d.lb.D + ' · J ' + d.lb.J + ')',
+       d.lb.A ? 'bad' : 'good');
+    kv('KNOWN', d.known.registers + ' reg · ' + d.known.catalog_rows + ' cat');
+    /* A STALE WATCHER IS NOT A BINDING.  fresh/watchers, and the number that
+       matters is the first one. */
+    kv('WATCHED', d.watched.watchers
+       ? d.watched.fresh + '/' + d.watched.watchers + ' fresh'
+       : null, d.watched.watchers && d.watched.fresh < d.watched.watchers ? 'bad' : null);
+    kv('OWED', d.owed || null);
+    kv('BLOCKED', d.blocked || null, d.blocked ? 'bad' : null);
+    kv('NEXT', d.next_rock ? d.next_rock.id + ' ' + d.next_rock.status : null);
+    card.appendChild(dl);
+
+    card.appendChild(el('div', 'src', d.links.length + ' container link(s)'));
+    card.addEventListener('click', function () { openDrawer(d.id); });
+    grid.appendChild(card);
+  });
+  h.appendChild(grid);
+
+  var total = B.domains.reduce(function (a, d) { return a + d.lb.total; }, 0);
+  h.appendChild(el('div', 'src', '13 cards · LB across the cards sums to ' + total
+    + ' and board.numbers.load_bearing.total is ' + em(B.numbers.load_bearing.total)
+    + ' · source: state/board.json domains[]'));
+
+  if (S.domain) openDrawer(S.domain);
+}
+
+/* THE DOMAIN DRAWER: its functions by route with their movers, its rocks, its
+   registers, its links.  Everything here is already on the board; the drawer
+   only groups it, which is why it can never disagree with the card. */
+function openDrawer(id) {
+  S.domain = id;
+  var B = S.board;
+  var d = B.domains.filter(function (x) { return x.id === id; })[0];
+  var host = q('#p-drawer');
+  if (!d) { host.classList.add('hidden'); return; }
+  host.classList.remove('hidden');
+  host.querySelector('h2').textContent = d.id + ' · ' + d.name;
+  var h = clear(body('p-drawer'));
+
+  var close = el('button', 'act', 'CLOSE');
+  close.addEventListener('click', function () {
+    S.domain = null;
+    host.classList.add('hidden');
+  });
+  h.appendChild(close);
+
+  var mine = B.lb_ledger.filter(function (r) { return r.domain === id; });
+  var byRoute = {};
+  mine.forEach(function (r) { (byRoute[r.route] = byRoute[r.route] || []).push(r); });
+  h.appendChild(el('div', 'lbl', 'LOAD-BEARING FUNCTIONS BY ROUTE — ' + mine.length));
+  var ft = tbl(h, ['fn', 'route', 'function', 'mover', 'sor', 'status']);
+  ['KNOW', 'WATCH', 'DO', 'ROUTE', 'DISCIPLINE', 'JUDGMENT'].forEach(function (rt) {
+    (byRoute[rt] || []).forEach(function (r) {
+      row(ft, [r.function, rt, r.name, r.mover, r.sor,
+               el('span', 'pill ' + (r.status === 'OPEN' ? 'crit' : ''), r.status)]);
+    });
+  });
+  if (!mine.length) row(ft, ['—', '—', 'nothing load-bearing in this domain', '—', '—', '—']);
+
+  var rocks = B.rocks.filter(function (r) {
+    return (r.name + ' ' + r.evidence).toLowerCase().indexOf(d.name.toLowerCase()) !== -1;
+  });
+  h.appendChild(el('div', 'lbl', 'ROCKS NAMING THIS DOMAIN — ' + rocks.length));
+  var rt2 = tbl(h, ['id', 'phase', 'status', 'rock']);
+  rocks.forEach(function (r) { row(rt2, [r.id, r.phase, r.status, r.name]); });
+  if (!rocks.length) row(rt2, ['—', '—', '—', 'no rock names this domain']);
+
+  var iss = B.horizon.issues.filter(function (x) {
+    return x.domain.slice(0, 2) === id || x.function.slice(0, 2) === id;
+  });
+  h.appendChild(el('div', 'lbl', 'OPEN ISSUES — ' + iss.length));
+  var it = tbl(h, ['id', 'sev', 'what']);
+  iss.forEach(function (x) { row(it, [x.id, x.severity, x.what]); });
+  if (!iss.length) row(it, ['—', '—', 'nothing open']);
+
+  h.appendChild(el('div', 'lbl', 'CONTAINERS — ' + d.links.length));
+  var lt = tbl(h, ['catalog id', 'where', 'address', 'title']);
+  d.links.forEach(function (l) {
+    row(lt, [l.catalog_id, l.location, addrLink(l.address), l.title]);
+  });
+  if (!d.links.length) row(lt, ['—', '—', 'nothing cataloged in this domain yet', '—']);
+  h.appendChild(el('div', 'src', 'source: state/board.json domains[' + id + '] + lb_ledger[] + catalog[]'));
+}
