@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0d10">
+<title>BEV</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./tokens.css">
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<div class="frame">
+
+  <header class="top">
+    <h1>BEV</h1>
+    <span class="age" id="age">loading…</span>
+    <span class="spacer"></span>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button data-view="board"    role="tab" aria-selected="true">BOARD</button>
+      <button data-view="domains"  role="tab" aria-selected="false">DOMAINS</button>
+      <button data-view="machine"  role="tab" aria-selected="false">MACHINE</button>
+      <button data-view="brain"    role="tab" aria-selected="false">BRAIN</button>
+      <button data-view="settings" role="tab" aria-selected="false">SETTINGS</button>
+    </nav>
+  </header>
+
+  <div id="banner"></div>
+
+  <!-- BOARD: the two numbers, then the horizon -->
+  <main id="view-board" class="grid">
+    <section class="panel c5" id="p-numbers"><h2>The two numbers</h2><div class="body"></div></section>
+    <section class="panel c7" id="p-trend"><h2>Thirty builds</h2><div class="body"></div></section>
+    <section class="panel c12" id="p-delta"><h2>State delta</h2><div class="body"></div></section>
+    <section class="panel c6" id="p-decisions"><h2>Decisions owed</h2><div class="body"></div></section>
+    <section class="panel c6" id="p-obligations"><h2>Obligations 7 / 30 / 90</h2><div class="body"></div></section>
+    <section class="panel c4" id="p-today"><h2>Today</h2><div class="body"></div></section>
+    <section class="panel c4" id="p-money"><h2>Money</h2><div class="body"></div></section>
+    <section class="panel c4" id="p-issues"><h2>Issues</h2><div class="body"></div></section>
+  </main>
+
+  <!-- DOMAINS: all thirteen -->
+  <main id="view-domains" class="grid hidden">
+    <section class="panel c12" id="p-domains"><h2>The 13 domains</h2><div class="body"></div></section>
+    <section class="panel c12 hidden" id="p-drawer"><h2>Domain</h2><div class="body"></div></section>
+  </main>
+
+  <!-- MACHINE: ledger, rocks, lanes -->
+  <main id="view-machine" class="grid hidden">
+    <section class="panel c12" id="p-lanes"><h2>Lanes — the sweep</h2><div class="body"></div></section>
+    <section class="panel c12" id="p-ledger"><h2>LB ledger</h2><div class="body"></div></section>
+    <section class="panel c12" id="p-rocks"><h2>Rocks by phase</h2><div class="body"></div></section>
+  </main>
+
+  <!-- BRAIN: catalog-first search -->
+  <main id="view-brain" class="grid hidden">
+    <section class="panel c12" id="p-brain"><h2>The brain — catalog first</h2><div class="body"></div></section>
+  </main>
+
+  <!-- SETTINGS -->
+  <main id="view-settings" class="grid hidden">
+    <section class="panel c6" id="p-settings"><h2>Settings</h2><div class="body"></div></section>
+    <section class="panel c6" id="p-about"><h2>What this reads</h2><div class="body"></div></section>
+  </main>
+
+</div>
+<script src="./app.js"></script>
+</body>
+</html>
