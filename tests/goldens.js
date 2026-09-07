@@ -139,6 +139,7 @@ global.localStorage = {
 global.document = {
   body: doc,
   createElement: t => new Node(t),
+  createElementNS: (ns, t) => new Node(t),
   createTextNode: t => { const n = new Node('#text'); n.textContent = t; return n; },
   querySelector: s => (s.startsWith('#') && !s.includes(' ') ? byId[s.slice(1)] || null : doc.querySelector(s)),
   querySelectorAll: s => doc.querySelectorAll(s)
@@ -157,7 +158,14 @@ global.fetch = (...a) => fetchImpl(...a);
 const APP = ['app.js', 'panels.js'].map(f => path.join(ROOT, f))
   .filter(p => fs.existsSync(p))
   .map(p => fs.readFileSync(p, 'utf8')).join('\n;\n');
-const run = new Function(APP + '\n;return {S:S, fetchBoard:fetchBoard, render:render, show:show, K:K};');
+const TAIL = [
+  '',
+  ';return {',
+  '  S: S, fetchBoard: fetchBoard, render: render, show: show, K: K,',
+  '  call: function (fn) { return eval(fn)(); }',
+  '};'
+].join('\n');
+const run = new Function(APP + TAIL);
 
 /* ---------------------------------------------------------------- asserts */
 
@@ -245,6 +253,9 @@ async function main() {
     'offline=' + app.S.offline + ' age="' + text('age').slice(0, 70) + '"');
 
   /* ---- panel goldens (S3-S7). Skipped cleanly until panels.js exists. ---- */
+  /* WHICH PANEL GOLDENS RUN IS DERIVED FROM panels.js ITSELF, never from a flag.
+     A section that has shipped its renderer cannot skip its own goldens, and a
+     section that has not shipped one is reported SKIP rather than passed. */
   if (fs.existsSync(path.join(ROOT, 'panels.js'))) {
     delete store['bev.cache'];
     fetchImpl = () => Promise.resolve({
@@ -264,8 +275,15 @@ async function main() {
 
 function panelGoldens(app) {
   const B = BOARD;
+  const SRC = fs.readFileSync(path.join(ROOT, 'panels.js'), 'utf8');
+  const has = fn => SRC.indexOf('function ' + fn + '(') !== -1;
+  const section = (name, fn, body) => {
+    if (!has(fn)) { console.log('SKIP  ' + name + ' - ' + fn + '() not built yet'); return; }
+    body();
+  };
 
   /* S3 — THE TWO NUMBERS. */
+  section('S3 the two numbers', 'renderNumbers', () => {
   const t = bodyText('p-numbers');
   check('S3 the two numbers render with SCORE and LOAD-BEARING',
     t.includes(String(B.numbers.score.value)) && t.includes(String(B.numbers.load_bearing.total)),
@@ -278,14 +296,36 @@ function panelGoldens(app) {
   check('S3 the provisional percentage is labelled provisional',
     !B.numbers.score.provisional || /PROVISIONAL/i.test(t),
     'provisional=' + B.numbers.score.provisional);
-  const pts = count('p-trend', 'circle') + count('p-trend', 'polyline');
-  check('S3 the sparkline draws one point per history entry',
-    (B.numbers.history || []).length === 0 ? true : count('p-trend', 'circle') === B.numbers.history.length,
-    'history=' + (B.numbers.history || []).length + ' circles=' + count('p-trend', 'circle') + ' marks=' + pts);
-  check('S3 the delta strip names what changed since the last build',
-    bodyText('p-delta').length > 0, '"' + bodyText('p-delta').slice(0, 70) + '"');
+  /* THE WIRE'S GOLDEN, LITERALLY: with two builds the sparkline has two points
+     and the delta strip names the change.  Two series are drawn (SCORE and
+     LOAD-BEARING A), so the assertion is two points PER SERIES - counting the
+     total would have passed on one build drawn twice. */
+  const SERIES = 2;
+  const two = JSON.parse(JSON.stringify(B));
+  const h0 = (B.numbers.history || [])[0] || { score: 100, A: 50, generated: '2026-09-06T00:00:00Z' };
+  two.numbers.history = [
+    Object.assign({}, h0, { score: h0.score - 3, A: h0.A + 2, build_id: 'aaaaaaaaaaaa',
+                            generated: '2026-09-06T00:00:00Z' }),
+    Object.assign({}, h0, { build_id: 'bbbbbbbbbbbb' })
+  ];
+  two.delta = { basis: 'by record key vs state/board_prev.json', count: 1, added: [], removed: [],
+                changed: [{ key: 'ROCK:ROCK-01', from: 'FAIL|1', to: 'PASS|1' }] };
+  app.S.board = two;
+  app.call('renderNumbers');
+  check('S3 two builds yield two points per series in the sparkline',
+    count('p-trend', 'circle') === 2 * SERIES && count('p-trend', 'polyline') === SERIES,
+    'circles=' + count('p-trend', 'circle') + ' polylines=' + count('p-trend', 'polyline')
+      + ' (' + SERIES + ' series x 2 builds)');
+  check('S3 the delta strip names the change',
+    /ROCK-01/.test(bodyText('p-delta')) && /FAIL/.test(bodyText('p-delta'))
+      && /PASS/.test(bodyText('p-delta')),
+    '"' + bodyText('p-delta').replace(/\s+/g, ' ').slice(0, 90) + '"');
+  app.S.board = B;
+  app.call('renderNumbers');
+  });
 
   /* S4 — THE HORIZON. */
+  section('S4 the horizon', 'renderHorizon', () => {
   check('S4 decisions owed renders one row per owed decision',
     count('p-decisions', 'tbody tr') === Math.min(B.horizon.decisions_owed.length, 200)
       || B.horizon.decisions_owed.length === 0,
@@ -304,8 +344,10 @@ function panelGoldens(app) {
   check('S4 a missing feed renders an em dash, never a zero (MONEY)',
     B.horizon.money === null ? bodyText('p-money').includes('—') : bodyText('p-money').length > 0,
     'money=' + (B.horizon.money === null ? 'null' : 'present') + ' "' + bodyText('p-money').slice(0, 40) + '"');
+  });
 
   /* S5 — THE 13 DOMAINS, and every count equals board.json. */
+  section('S5 the 13 domains', 'renderDomains', () => {
   check('S5 renders exactly 13 domain cards',
     count('p-domains', 'tbody tr') === 13 || count('p-domains', '.domcard') === 13,
     'cards=' + count('p-domains', '.domcard') + ' rows=' + count('p-domains', 'tbody tr'));
@@ -314,8 +356,10 @@ function panelGoldens(app) {
     !dt.includes(d.name) || !dt.includes(String(d.lb.total)));
   check('S5 every count on a card equals board.json', !badDomain,
     badDomain ? 'first mismatch: ' + badDomain.id + ' ' + badDomain.name : 'all 13 match');
+  });
 
   /* S6 — THE MACHINE. */
+  section('S6 the machine', 'renderMachine', () => {
   check('S6 the LB ledger renders every row with its mover',
     count('p-ledger', 'tbody tr') === B.lb_ledger.length,
     'ledger=' + B.lb_ledger.length + ' rows=' + count('p-ledger', 'tbody tr'));
@@ -325,11 +369,13 @@ function panelGoldens(app) {
   check('S6 lanes render one row per lane',
     count('p-lanes', 'tbody tr') === B.lanes.length || B.lanes.length === 0,
     'lanes=' + B.lanes.length + ' rows=' + count('p-lanes', 'tbody tr'));
+  });
 
   /* S7 — THE BRAIN, and the stranger test (R9.5): every sampled catalog id is
      reached in <= 2 hops.  HOP 1 = type the id into the search box.  HOP 2 =
      follow the address on the row it returns.  A row with no address is not
      reachable in two hops and fails, which is the whole point of the test. */
+  section('S7 the brain', 'renderBrain', () => {
   check('S7 the catalog is searchable and every row shows its sensitivity',
     count('p-brain', 'input') >= 1 && B.catalog.every(c => c.sensitivity),
     'inputs=' + count('p-brain', 'input') + ' rows=' + B.catalog.length);
@@ -341,6 +387,7 @@ function panelGoldens(app) {
     sample.length > 0 && unreachable.length === 0,
     (sample.length - unreachable.length) + '/' + sample.length
       + (unreachable.length ? ' unreachable: ' + unreachable.map(c => c.id).join(',') : ''));
+  });
 }
 
 main();
