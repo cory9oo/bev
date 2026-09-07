@@ -593,3 +593,11 @@ function renderBrain() {
   h.appendChild(el('div', 'src', 'source: master-brain/CATALOG.md — 164 LIVE rows, parsed from the header '
     + 'to the fence; the 6 RETIRED rows below it are not the estate'));
 }
+
+/* ---------------------------------------------------------------- boot
+
+   LAST LINE OF THE LAST SCRIPT.  app.js defines boot() and deliberately does not
+   call it: render() asks `typeof renderNumbers === 'function'`, so booting from
+   app.js renders every panel empty because this file has not been parsed yet.
+   Whoever loads last starts the app, and that is this file. */
+boot();

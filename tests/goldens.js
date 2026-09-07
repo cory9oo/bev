@@ -189,6 +189,25 @@ const count = (id, sel) => {
 async function main() {
   console.log('board: ' + boardPath + (SYNTHETIC ? '   *** SYNTHETIC SAMPLE ***' : '   (live)'));
 
+  /* G0 — LOAD ORDER.  THIS HARNESS CONCATENATES app.js AND panels.js, so it
+     tests a program the browser never runs.  When app.js booted itself at its
+     own last line, every panel came up EMPTY in a real browser - render() probes
+     `typeof renderNumbers === 'function'` and panels.js had not been parsed yet -
+     and all 25 goldens passed anyway.  A real browser caught it.  These two
+     assertions are the harness admitting what it cannot see. */
+  const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+  check('app.js defines boot() and does not call it',
+    /function boot\s*\(/.test(appSrc) && !/^boot\(\);/m.test(appSrc),
+    'defines=' + /function boot\s*\(/.test(appSrc) + ' self-calls=' + /^boot\(\);/m.test(appSrc));
+  if (fs.existsSync(path.join(ROOT, 'panels.js'))) {
+    const panelSrc = fs.readFileSync(path.join(ROOT, 'panels.js'), 'utf8');
+    const order = html.indexOf('app.js') < html.indexOf('panels.js');
+    check('panels.js loads last and is the one that calls boot()',
+      order && /^boot\(\);/m.test(panelSrc),
+      'app.js before panels.js in index.html=' + order
+        + ' panels.js calls boot=' + /^boot\(\);/m.test(panelSrc));
+  }
+
   /* G1 — NO TOKEN RENDERS SETTINGS, never a blank page and never a spinner. */
   fetchImpl = () => Promise.reject(new Error('should not be called without a token'));
   let app = run();

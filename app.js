@@ -246,7 +246,12 @@ function renderBanner() {
     var d = el('div', 'src'); d.textContent = e.detail; box.appendChild(d);
   }
   n.appendChild(box);
-  if (e.kind === 'NO_TOKEN') show('settings');
+  /* Force Settings ONLY when there is nothing to show. A cached board with an
+     expired or missing token is still the last true reading, and hiding it
+     behind a form is the blank-page failure wearing a different hat: the reader
+     came to see the numbers, and yesterday's numbers labelled yesterday beat no
+     numbers at all. */
+  if (e.kind === 'NO_TOKEN' && !S.board) show('settings');
 }
 
 /* ---------------------------------------------------------------- settings */
@@ -378,17 +383,30 @@ function render() {
 
 /* ---------------------------------------------------------------- boot */
 
-Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
-  b.addEventListener('click', function () { show(b.dataset.view); });
-});
+/* BOOT IS CALLED FROM THE END OF panels.js, NOT FROM HERE.
 
-loadCache();
-render();
-fetchBoard(false);
-scheduleRefresh();
+   It used to run at the bottom of this file, and every panel came up EMPTY in a
+   real browser: render() probes `typeof renderNumbers === 'function'`, and at
+   that moment panels.js - the next <script> tag - had not been parsed yet. The
+   goldens did not catch it because the harness CONCATENATES the two files, so
+   the renderers were always defined before the boot line ran. A test harness
+   that joins two files tests a program the browser never runs.
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function () {});
+   The fix is one mechanism, not an environment branch: whoever is loaded last
+   calls boot(), and in both the page and the harness that is panels.js. */
+function boot() {
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
+    b.addEventListener('click', function () { show(b.dataset.view); });
   });
+
+  loadCache();
+  render();
+  fetchBoard(false);
+  scheduleRefresh();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
 }
