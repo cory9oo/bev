@@ -435,3 +435,100 @@ function openDrawer(id) {
   if (!d.links.length) row(lt, ['—', '—', 'nothing cataloged in this domain yet', '—']);
   h.appendChild(el('div', 'src', 'source: state/board.json domains[' + id + '] + lb_ledger[] + catalog[]'));
 }
+
+/* ================================================================ S6 · THE MACHINE */
+
+/* THIS PANEL IS THE SWEEP.  When it is live, reading four BUILD_LOGs by hand to
+   learn where the estate stands stops being a task anyone does — which is the
+   hours-returned claim this whole wire rests on. */
+function renderMachine() {
+  var B = S.board;
+
+  var lh = clear(body('p-lanes'));
+  var lt = tbl(lh, ['lane', 'last receipt', 'age', 'active wire', 'queue', 'usage', 'FOR CORY']);
+  (B.lanes || []).forEach(function (l) {
+    var age = el('span', l.last_receipt_age_days === null ? 'none'
+      : (l.last_receipt_age_days > 1 ? 'bad' : 'good'), em(l.last_receipt_age_days, 'd'));
+    row(lt, [l.lane, l.last_receipt_date, age, l.active_wire, l.queue_depth, l.usage,
+             el('span', l.for_cory ? 'pill crit' : 'pill', String(l.for_cory))]);
+  });
+  if (!(B.lanes || []).length) row(lt, ['—', '—', '—', 'lane files not readable from this build', '—', '—', '—']);
+  lh.appendChild(el('div', 'src', 'source: _reconcile/BUILD_LOG_<LANE>.md · NEXT_<LANE>.md · <lane>_queue/QUEUE.md'));
+
+  /* THE LB LEDGER, filterable by domain / route / status, EVERY ROW SHOWING ITS
+     MOVER.  The mover column is the countermeasure the 07:22 receipt asked for:
+     three wires in a row predicted a movement from one clause of a two-clause
+     function, and a ledger that names what actually moves each row makes that
+     mistake visible before the wire is written rather than after it stops. */
+  var h = clear(body('p-ledger'));
+  var ctl = el('div');
+  ctl.style.display = 'flex';
+  ctl.style.gap = '8px';
+  ctl.style.marginBottom = '10px';
+  ctl.style.flexWrap = 'wrap';
+
+  function sel(label, values, key) {
+    var wrap = el('div');
+    wrap.appendChild(el('div', 'lbl', label));
+    var s = document.createElement('select');
+    ['(all)'].concat(values).forEach(function (v) {
+      var o = document.createElement('option');
+      o.value = v === '(all)' ? '' : v;
+      o.textContent = v;
+      s.appendChild(o);
+    });
+    s.value = S.filter[key] || '';
+    s.addEventListener('change', function () { S.filter[key] = s.value; drawLedger(); });
+    wrap.appendChild(s);
+    ctl.appendChild(wrap);
+    return s;
+  }
+  var uniq = function (k) {
+    var seen = {}, out = [];
+    B.lb_ledger.forEach(function (r) { if (r[k] && !seen[r[k]]) { seen[r[k]] = 1; out.push(r[k]); } });
+    return out.sort();
+  };
+  sel('domain', uniq('domain'), 'domain');
+  sel('route', uniq('route'), 'route');
+  sel('status', uniq('status'), 'status');
+  h.appendChild(ctl);
+
+  var count = el('div', 'sub');
+  h.appendChild(count);
+  var tb = tbl(h, ['fn', 'dom', 'route', 'bucket', 'function', 'mover', 'sor', 'status']);
+
+  function drawLedger() {
+    clear(tb);
+    var f = S.filter;
+    var rows = B.lb_ledger.filter(function (r) {
+      return (!f.domain || r.domain === f.domain)
+        && (!f.route || r.route === f.route)
+        && (!f.status || r.status === f.status);
+    });
+    count.textContent = rows.length + ' of ' + B.lb_ledger.length + ' load-bearing rows';
+    rows.forEach(function (r) {
+      row(tb, [r.function, r.domain, r.route, r.bucket, r.name, r.mover, r.sor,
+               el('span', 'pill ' + (r.status === 'OPEN' ? 'crit' : ''), r.status)]);
+    });
+  }
+  drawLedger();
+
+  /* ROCKS BY PHASE.  Status comes from a receipt, never from a document. */
+  var rh = clear(body('p-rocks'));
+  var tally = {};
+  B.rocks.forEach(function (r) { tally[r.status] = (tally[r.status] || 0) + 1; });
+  rh.appendChild(el('div', 'sub', Object.keys(tally).sort().map(function (k) {
+    return k + ' ' + tally[k];
+  }).join('  ·  ') + '   (of ' + B.rocks.length + ')'));
+  var phases = {};
+  B.rocks.forEach(function (r) { (phases[r.phase] = phases[r.phase] || []).push(r); });
+  var rt = tbl(rh, ['id', 'phase', 'status', 'rock', 'lane', 'last receipt', 'evidence']);
+  Object.keys(phases).sort().forEach(function (p) {
+    phases[p].forEach(function (r) {
+      row(rt, [r.id, r.phase,
+               el('span', 'pill ' + (r.status === 'PASS' ? 'ok' : r.status === 'FAIL' ? 'crit' : ''), r.status),
+               r.name, r.owner_lane, r.last_receipt, r.evidence]);
+    });
+  });
+  rh.appendChild(el('div', 'src', 'status is computed by tools/rock_check.py from a receipt, never typed'));
+}

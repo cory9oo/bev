@@ -42,6 +42,8 @@ var S = {
   error: null,
   view: 'board',
   domain: null,
+  filter: { domain: '', route: '', status: '' },
+  query: '',
   timer: null
 };
 
