@@ -532,3 +532,55 @@ function renderMachine() {
   });
   rh.appendChild(el('div', 'src', 'status is computed by tools/rock_check.py from a receipt, never typed'));
 }
+
+/* ================================================================ S7 · THE BRAIN */
+
+/* CATALOG-FIRST SEARCH, client-side over catalog[].  A result row links straight
+   to its address — Drive, repo path, ClickUp, HT, SB, or a Brain shelf.
+
+   THE STRANGER TEST (R9.5) IS THE GOLDEN: any catalog id typed here is reached in
+   two hops — hop one is this box, hop two is the address on the row it returns.
+   A row with no address fails the test, which is exactly what it should do.
+
+   SENSITIVITY IS SHOWN ON EVERY ROW.  PRIVATE rows are visible because the page
+   itself is private by R70.109 — and build_board.py's B1 export filter REFUSES an
+   untagged row, so an untagged row never reaches the board at all. */
+function renderBrain() {
+  var B = S.board;
+  var h = clear(body('p-brain'));
+
+  var box = document.createElement('input');
+  box.type = 'text';
+  box.placeholder = 'catalog id, title, address, alias, domain, type…';
+  box.value = S.query || '';
+  h.appendChild(box);
+
+  var meta = el('div', 'sub');
+  h.appendChild(meta);
+  var tb = tbl(h, ['id', 'where', 'address', 'domain', 'type', 'sensitivity', 'title']);
+
+  function draw() {
+    clear(tb);
+    var qs = (S.query || '').trim().toLowerCase();
+    var rows = !qs ? B.catalog : B.catalog.filter(function (c) {
+      return [c.id, c.title, c.address, c.aliases, c.domain, c.type, c.location]
+        .join(' ').toLowerCase().indexOf(qs) !== -1;
+    });
+    meta.textContent = rows.length + ' of ' + B.catalog.length + ' catalog rows'
+      + (B.catalog_refused && B.catalog_refused.length
+        ? '  ·  ' + B.catalog_refused.length + ' untagged row(s) REFUSED by the export filter (B1)'
+        : '  ·  0 refused');
+    rows.slice(0, 400).forEach(function (c) {
+      row(tb, [c.id, c.location, addrLink(c.address), c.domain, c.type,
+               el('span', 'pill', c.sensitivity), c.title]);
+    });
+    if (rows.length > 400) {
+      row(tb, ['…', '', 'narrow the search — ' + (rows.length - 400) + ' more rows match', '', '', '', '']);
+    }
+  }
+  box.addEventListener('input', function () { S.query = box.value; draw(); });
+  box.addEventListener('change', function () { S.query = box.value; draw(); });
+  draw();
+  h.appendChild(el('div', 'src', 'source: master-brain/CATALOG.md — 164 LIVE rows, parsed from the header '
+    + 'to the fence; the 6 RETIRED rows below it are not the estate'));
+}
