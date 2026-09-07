@@ -304,6 +304,58 @@ function renderHorizon() {
     ['gaps', function (m) { return m.gap_count; }]
   ], 'SB feed — _reconcile/sb_feed/money.json');
 
+  /* S10 · ENVIRONMENT.  A NUMBER WITHOUT A SOURCE DOES NOT RENDER, and the fetch
+     date rides every value: a rate presented as current when it is three weeks old
+     is worse than no rate. */
+  var env = B.environment;
+  var eh = clear(body('p-env'));
+  if (!env || !(env.indicators || []).length) {
+    eh.appendChild(el('div', 'num none', '—'));
+    eh.appendChild(el('div', 'sub', env ? 'the scan ran and fetched nothing — see the log'
+                                        : 'not measured — env_scan.py has not run'));
+    (env && env.log || []).forEach(function (l) { eh.appendChild(el('div', 'src', l)); });
+  } else {
+    var et = tbl(eh, ['indicator', 'value', 'as of', 'why it matters', 'source']);
+    env.indicators.forEach(function (x) {
+      row(et, [x.key, x.value + (x.unit === 'percent' ? '%' : ''), x.as_of, x.why_it_matters,
+               link(x.url, 'FRED')]);
+    });
+    (env.unavailable || []).forEach(function (u) {
+      row(et, [u.key, el('span', 'none', '—'), '—', u.reason, u.source]);
+    });
+    eh.appendChild(el('div', 'src', 'fetched ' + em(env.fetched_at)
+      + '  ·  free sources only, no key, no login, no stored credential'));
+  }
+
+  /* S11 · SIMULATE-LITE.  Dates and dollars only, every input traced to a register
+     row, and a constant that is NOT in a register is NAMED rather than computed. */
+  var sc = B.scenarios;
+  var sh = clear(body('p-scenarios'));
+  if (!sc) {
+    sh.appendChild(el('div', 'num none', '—'));
+    sh.appendChild(el('div', 'sub', 'not measured — simulate.py has not run'));
+  } else {
+    var hd2 = el('div');
+    hd2.appendChild(el('span', 'pill crit', sc.label));
+    hd2.appendChild(el('span', 'sub', '  ' + sc.subject));
+    sh.appendChild(hd2);
+    var st2 = tbl(sh, ['extend', 'new maturity', 'days out', 'payments', 'ext fee (prior rate)',
+                       'total SOURCED', 'carry']);
+    (sc.scenarios || []).forEach(function (x) {
+      row(st2, ['+' + x.months + ' mo', x.new_maturity, x.days_from_today + 'd',
+                x.payments_consumed, x.extension_fee_at_prior_rate, x.total_sourced_cost,
+                el('span', 'none', 'NOT COMPUTED')]);
+    });
+    (sc.missing || []).forEach(function (m) {
+      var w = el('div', 'note warn');
+      w.appendChild(el('div', 'lbl', 'NOT COMPUTED — ' + m.value));
+      w.appendChild(el('div', 'sub', m.why));
+      w.appendChild(el('div', 'src', 'settles it: ' + m.settles_it));
+      sh.appendChild(w);
+    });
+    sh.appendChild(el('div', 'src', sc.no_outbound));
+  }
+
   var i = clear(body('p-issues'));
   var iss = H.issues || [];
   var crit = iss.filter(function (x) { return x.severity === 'CRITICAL'; });
@@ -404,6 +456,21 @@ function renderDomains() {
     kv('NEXT', d.next_rock ? d.next_rock.id + ' ' + d.next_rock.status : null);
     card.appendChild(dl);
 
+    /* S12 · NEXT BEST ACTION on every card, and NO CARD IS EVER BLANK.  A JUDGMENT
+       domain says "no mover" in words: printing "ask Cory" against 56 judgment
+       functions would be a lie the board tells every day, and those functions are
+       the moat, not the debt (DEC-029). */
+    var nba = d.next_best_action;
+    var nb = el('div', 'sub');
+    nb.style.marginTop = '8px';
+    if (!nba) {
+      nb.appendChild(el('span', 'none', 'NEXT — nothing load-bearing in this domain'));
+    } else {
+      nb.appendChild(el('span', 'lbl', 'NEXT '));
+      nb.appendChild(el('span', 'mono', nba.function + '  '));
+      nb.appendChild(el('span', nba.has_mover ? null : 'none', nba.what));
+    }
+    card.appendChild(nb);
     if (d.id === '04' && (S.board.people || []).length) {
       /* R70.152: the people register surfaces under domain 04, where relationships live. */
       var pl = el('div', 'sub');

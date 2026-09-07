@@ -367,6 +367,13 @@ function panelGoldens(app) {
 
   /* S5 — THE 13 DOMAINS, and every count equals board.json. */
   section('S5 the 13 domains', 'renderDomains', () => {
+  /* S12: no card may be blank. A judgment domain says "no mover" IN WORDS. */
+  const missingNba = B.domains.filter(d => !d.next_best_action);
+  check('S12 all 13 domain cards carry a next-best-action or an explicit no-mover',
+    missingNba.length === 0
+      && B.domains.every(d => bodyText('p-domains').includes(d.next_best_action.function)),
+    (13 - missingNba.length) + '/13 carry one; judgment domains: '
+      + B.domains.filter(d => !d.next_best_action.has_mover).map(d => d.id).join(',') || 'none');
   check('S5 renders exactly 13 domain cards',
     count('p-domains', 'tbody tr') === 13 || count('p-domains', '.domcard') === 13,
     'cards=' + count('p-domains', '.domcard') + ' rows=' + count('p-domains', 'tbody tr'));
