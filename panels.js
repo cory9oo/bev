@@ -267,6 +267,31 @@ function renderHorizon() {
     ['standards', function (t) { return t.standards; }]
   ], 'HT feed — _reconcile/ht_feed/adherence.json (R70.47)');
 
+  /* COMMITTED TIME (S4). The unblocked count is the number that matters and it is
+     rendered in the bad token: a dated promise with nothing on a calendar behind
+     it is an earlier, quieter failure than a missed deadline. */
+  var ct = H.committed_time;
+  var cth = clear(body('p-committed'));
+  if (!ct) {
+    cth.appendChild(el('div', 'num none', '—'));
+    cth.appendChild(el('div', 'sub', 'not measured — the time ledger has not run'));
+    cth.appendChild(el('div', 'src', 'life-taxonomy/state/committed_time.json (tools/time_ledger.py)'));
+  } else {
+    var n = ct.unblocked_obligations.length;
+    var hd = el('div');
+    hd.appendChild(el('span', 'num sm ' + (n ? 'bad' : 'good'), String(n)));
+    hd.appendChild(el('span', 'sub', '  dated obligation(s) with NO time behind them'));
+    cth.appendChild(hd);
+    cth.appendChild(el('div', 'sub', ct.next_7.length + ' committed in 7d · '
+      + ct.next_30.length + ' in 30d' + (ct.mode === 'DRY' ? '  ·  DRY (no token)' : '')));
+    var ctt = tbl(cth, ['id', 'due', 'what']);
+    ct.unblocked_obligations.slice(0, 30).forEach(function (u) {
+      row(ctt, [u.id, u.due, u.subject]);
+    });
+    if (!n) row(ctt, ['—', '—', 'every dated obligation has time behind it']);
+    if (ct.source) cth.appendChild(srcLine(ct.source));
+  }
+
   feedPanel('p-money', H.money, [
     ['book cash', function (m) { return m.book_cash; }],
     ['months reserve', function (m) { return m.months_reserve; }],
