@@ -83,9 +83,15 @@ function renderNumbers() {
   v.textContent = em(n.score.value);
   a.appendChild(v);
   var pct = el('div', 'sub');
-  pct.textContent = em(n.score.pct, '%') + (n.score.provisional ? ' PROVISIONAL' : '')
-    + '  ·  denominator ' + em(n.score.denominator)
-    + (n.score.provisional ? ' moves until the census closes (Rock 1)' : '');
+  /* THE CAPTION IS CONDITIONAL.  It read "denominator moves until the census
+     closes" unconditionally, so the moment ROCK-01 passed the page went on saying
+     it about a census that had closed.  A caption that outlives its condition is a
+     lie the page tells every day. */
+  pct.textContent = n.score.provisional
+    ? em(n.score.pct, '%') + ' PROVISIONAL  ·  denominator ' + em(n.score.denominator)
+      + ' moves until the census closes (Rock 1)'
+    : em(n.score.pct, '%') + '  ·  denominator ' + em(n.score.denominator)
+      + '  ·  ROCK-01 census CLOSED — no longer provisional';
   a.appendChild(pct);
   if (srcLine(n.score.source)) a.appendChild(srcLine(n.score.source));
   h.appendChild(a);
