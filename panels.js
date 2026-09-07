@@ -232,20 +232,29 @@ function renderHorizon() {
     });
     o.appendChild(nb);
   }
-  [7, 30, 90].forEach(function (band) {
-    var rows = obl.filter(function (x) { return x.band === band; });
-    var head = el('div', 'lbl', 'within ' + band + ' days — ' + rows.length);
+  /* THE BANDS GROUP THE ROWS; THEY DO NOT FILTER THEM.  A first cut printed only
+     the three open bands and the board lost ten dated obligations — Rock 22's
+     probe counts DATED rows that REACH the board and it was right to fail.  A
+     closed obligation with a date is history the horizon still shows; it is
+     grouped apart, never dropped. */
+  [[7, 'within 7 days'], [30, 'within 30 days'], [90, 'within 90 days'],
+   [null, 'open, beyond 90 days or undated'], ['closed', 'dated, no longer open']
+  ].forEach(function (g) {
+    var rows = g[0] === 'closed'
+      ? obl.filter(function (x) { return !x.open; })
+      : obl.filter(function (x) { return x.open && x.band === g[0]; });
+    var head = el('div', 'lbl', g[1] + ' — ' + rows.length);
     head.style.marginTop = '12px';
     o.appendChild(head);
-    var t = tbl(o, ['id', 'days', 'subject', 'counterparty', 'amount']);
+    var t = tbl(o, ['id', 'due', 'days', 'subject', 'counterparty', 'amount']);
     rows.forEach(function (x) {
-      var d = el('span', daysClass(x.days_left), em(x.days_left, 'd'));
-      row(t, [x.id, d, x.subject, x.counterparty, x.amount_usd]);
+      var d = el('span', x.open ? daysClass(x.days_left) : 'none',
+                 x.open ? em(x.days_left, 'd') : x.status);
+      row(t, [x.id, x.due, d, x.subject, x.counterparty, x.amount_usd]);
     });
-    if (!rows.length) row(t, ['—', '—', 'none in this band', '—', '—']);
+    if (!rows.length) row(t, ['—', '—', '—', 'none in this band', '—', '—']);
   });
-  var beyond = obl.filter(function (x) { return x.band === null; }).length;
-  o.appendChild(el('div', 'src', beyond + ' further open obligation(s) beyond 90 days or undated'
+  o.appendChild(el('div', 'src', obl.length + ' obligation row(s), none filtered out'
     + '  ·  source: life-taxonomy/registers/obligations.csv + _reconcile/OBLIGATIONS_HORIZON.md'));
 
   /* TODAY (HT) and MONEY (SB) render an em dash until their feeds exist.  Not a
