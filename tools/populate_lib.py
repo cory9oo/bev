@@ -469,10 +469,22 @@ def run_store(fn, *a, **kw) -> dict:
     try:
         return fn(*a, **kw)
     except Wall as w:
-        return {"store": getattr(fn, "STORE", "?"), "at_origin": 0, "copied": 0, "skipped": 0,
-                "failed": 0, "walls": [str(w)], "notes": [], "since": "", "ran_at": now_utc_z(),
-                "ran_at_local": now_cdt(), "source": "none", "grain": "-", "oversize": [],
-                "manifest_rows": 0}
+        # A WALLED STORE STILL WRITES ITS COUNTS. Without this the container simply has no
+        # `records/clickup/` at all, and a reader cannot tell "waiting on a credential" from
+        # "nobody ever tried" - which is the difference between a known gap and an unknown one.
+        # PASTE 108 P2 asks for a COUNTS.json per store, not per store that happened to work.
+        # The Store is re-opened rather than invented, so `manifest_rows` still reports whatever
+        # an earlier successful run left behind instead of resetting it to zero.
+        try:
+            args = a[0] if a else None
+            st = Store(getattr(fn, "STORE", "?"), args.estate, getattr(args, "dry_run", False))
+            grain = getattr(sys.modules.get(fn.__module__), "GRAIN", "-")
+            return st.finish(0, since_of(args), "none", grain, walls=[str(w)])
+        except Exception:                     # no estate to write into (a unit test, a bad path)
+            return {"store": getattr(fn, "STORE", "?"), "at_origin": 0, "copied": 0, "skipped": 0,
+                    "failed": 0, "walls": [str(w)], "notes": [], "since": "", "ran_at": now_utc_z(),
+                    "ran_at_local": now_cdt(), "source": "none", "grain": "-", "oversize": [],
+                    "manifest_rows": 0}
     except Exception as e:                                     # noqa: BLE001 - deliberate, see above
         return {"store": getattr(fn, "STORE", "?"), "at_origin": 0, "copied": 0, "skipped": 0,
                 "failed": 1, "walls": ["DEFECT %s: %s" % (type(e).__name__, e)], "notes": [], "since": "",

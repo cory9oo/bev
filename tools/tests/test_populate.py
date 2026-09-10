@@ -339,3 +339,19 @@ def test_a_named_skip_is_a_note_not_a_wall(estate):
 
     w = L.run_store(populate_clickup.run, args_for(estate))
     assert w["walls"] and w["notes"] == [], "a missing credential IS a wall"
+
+
+def test_a_walled_store_still_writes_its_counts(estate):
+    """PASTE 108 P2 asks for a COUNTS.json per store, not per store that happened to work.
+    Without one, `records/clickup/` simply does not exist, and a reader cannot tell "waiting on
+    a credential" from "nobody ever tried"."""
+    c = L.run_store(populate_clickup.run, args_for(estate))
+    p = estate / "master-brain" / "records" / "clickup" / "COUNTS.json"
+    assert p.exists(), "a walled store left no COUNTS.json"
+    on_disk = json.loads(p.read_text(encoding="utf-8"))
+    assert on_disk["store"] == "clickup" and on_disk["at_origin"] == 0
+    assert any("NOT RUN LIVE" in w for w in on_disk["walls"])
+    assert "CSV per list per month" in on_disk["grain"], "the grain is recorded even when walled"
+    idx = (estate / "master-brain" / "records" / "clickup" / "INDEX.md").read_text(encoding="utf-8")
+    assert "BRAIN-RECORDS-CLICKUP" in idx and "NOT RUN LIVE" in idx
+    assert c["failed"] == 0
