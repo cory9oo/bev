@@ -38,6 +38,7 @@ def load(store: str):
 def main() -> int:
     ap = add_common_args(argparse.ArgumentParser(prog="populate_all.py"))
     ap.add_argument("--only", default="", help="comma list of stores; default all six")
+    ap.add_argument("--accounts", default="")                     # consumed by populate_gmail
     ap.add_argument("--own-share", type=float, default=0.05)      # consumed by populate_gmail
     a = ap.parse_args()
     a.estate = estate_root(a.estate)

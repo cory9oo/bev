@@ -11,11 +11,13 @@ SOURCES, in the order tried:
     --snapshot <dir>   the PASTE 98 in-chat export: INDEX.tsv + <thread_id>.md bodies
     live               Composio GMAIL_FETCH_EMAILS against the connected account
 
-WHOSE ACCOUNT IS IT. The snapshot names no account list and the mirror note names none either, so
-this script does not invent one: an address is "ours" when it appears on at least `--own-share` of
-threads (5% by default), measured over the corpus. That is derived from the data and reported in
-COUNTS, rather than hardcoded from memory - a hardcoded address that is wrong quietly files a whole
-account under `unfiled`.
+WHOSE ACCOUNT IS IT. `--accounts a@x,b@y` states it; the heuristic is only the FALLBACK for when
+nobody has. That order was earned: run without it over the real 245-thread snapshot, the 5%-share
+rule promoted `palermoconstruction@outlook.com` - a frequent CORRESPONDENT - to an account folder,
+and filed six of Cory's own threads under someone else's name. Frequency cannot tell "my mailbox"
+from "the person I email most"; only the operator can. So the operator gets a flag, the fallback
+stays for a first run against an unknown corpus, and `COUNTS.json` records which one decided
+(`accounts_source: declared | inferred`) so a wrong partition is visible instead of plausible.
 """
 from __future__ import annotations
 
@@ -94,8 +96,10 @@ def read_live(api_key: str, since: str | None, limit: int) -> tuple[list[dict], 
     return list(rows.values()), bodies
 
 
-def own_accounts(rows: list[dict], share: float) -> set[str]:
-    """An address is ours when it sits on at least `share` of threads. Measured, not remembered."""
+def own_accounts(rows: list[dict], share: float, declared: str = "") -> tuple[set[str], str]:
+    """-> (the accounts, how we knew). Declared wins; the frequency rule is the fallback."""
+    if declared.strip():
+        return {_norm(a) for a in declared.split(",") if a.strip()}, "declared"
     seen: dict[str, int] = {}
     for r in rows:
         for side in ("from", "to"):
@@ -104,7 +108,7 @@ def own_accounts(rows: list[dict], share: float) -> set[str]:
                 if "@" in a:
                     seen[a] = seen.get(a, 0) + 1
     floor = max(2, int(len(rows) * share))
-    return {a for a, n in seen.items() if n >= floor}
+    return {a for a, n in seen.items() if n >= floor}, "inferred"
 
 
 def run(args) -> dict:
@@ -123,7 +127,7 @@ def run(args) -> dict:
         source = "composio:GMAIL_FETCH_EMAILS"
 
     at_origin = len(rows)
-    ours = own_accounts(rows, args.own_share)
+    ours, how = own_accounts(rows, args.own_share, getattr(args, "accounts", "") or "")
     by_month: dict[str, list[dict]] = {}
     n = 0
     try:
@@ -157,6 +161,7 @@ def run(args) -> dict:
 
     counts = st.finish(at_origin, since, source, GRAIN, walls)
     counts["accounts"] = sorted(ours)
+    counts["accounts_source"] = how
     return counts
 
 
@@ -164,8 +169,11 @@ run.STORE = STORE
 
 
 def _own_share(ap):
+    ap.add_argument("--accounts", default="",
+                    help="comma list of YOUR mailboxes. States what the fallback can only guess.")
     ap.add_argument("--own-share", type=float, default=0.05,
-                    help="an address on at least this share of threads is one of ours")
+                    help="FALLBACK only, when --accounts is absent: an address on at least this "
+                         "share of threads is treated as one of ours")
 
 
 if __name__ == "__main__":

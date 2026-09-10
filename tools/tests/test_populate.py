@@ -65,7 +65,7 @@ def estate(tmp_path):
 
 def args_for(estate, **kw):
     base = dict(since=None, full=False, dry_run=False, snapshot=None, limit=0, fail_after=0,
-                estate=str(estate), json=False, own_share=0.05)
+                estate=str(estate), json=False, own_share=0.05, accounts="")
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -275,3 +275,33 @@ def test_estate_root_is_found_from_a_worktree_depth(tmp_path, monkeypatch):
     monkeypatch.setattr(L, "__file__", str(deep / "populate_lib.py"))
     monkeypatch.delenv("BEV_ROOT", raising=False)
     assert os.path.normcase(L.estate_root()) == os.path.normcase(str(root))
+
+
+def test_declared_accounts_beat_the_frequency_fallback(estate):
+    """MEASURED REGRESSION. Over the real 245-thread snapshot the 5%-share fallback promoted
+    `palermoconstruction@outlook.com` - a frequent CORRESPONDENT - to an account folder and filed
+    six of Cory's own threads under someone else's name. Frequency cannot tell "my mailbox" from
+    "the person I email most". `--accounts` states it; the fallback only guesses."""
+    # A correspondent Cory emails on most threads - which is what the real snapshot had.
+    snap = estate / "snap2"
+    snap.mkdir()
+    hdr = ("thread_id", "date", "from", "to", "subject", "labels", "message_count")
+    rows = [("dddd111122223333", "2026-09-09", "cory@own.com", "loud@corp.com", "a", "SENT", "1"),
+            ("eeee111122223333", "2026-09-08", "loud@corp.com", "cory@own.com", "b", "INBOX", "1"),
+            ("ffff111122223333", "2026-09-07", "cory@own.com", "loud@corp.com", "c", "SENT", "1")]
+    (snap / "INDEX.tsv").write_text(
+        "\n".join("\t".join(r) for r in [hdr] + rows) + "\n", encoding="utf-8")
+    snap = str(snap)
+
+    loud = populate_gmail.run(args_for(estate, snapshot=snap))
+    assert "loud@corp.com" in loud["accounts"], "the fallback promotes a frequent correspondent"
+    assert loud["accounts_source"] == "inferred"
+
+    declared = populate_gmail.run(args_for(estate, snapshot=snap, accounts="cory@own.com"))
+    assert declared["accounts"] == ["cory@own.com"]
+    assert declared["accounts_source"] == "declared"
+    root = estate / "master-brain" / "records" / "gmail"
+    # The declared run re-files every thread under the real mailbox. The fallback's wrong folder
+    # is left on disk (nothing is ever deleted - DEC-037); what matters is that no NEW thread
+    # lands under a correspondent's name once the operator has said what the mailboxes are.
+    assert "cory@own.com" in [p.name for p in root.iterdir() if p.is_dir()]

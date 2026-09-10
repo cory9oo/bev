@@ -29,6 +29,11 @@ schtasks /Create /TN "BEV populate" /SC DAILY /ST 05:30 ^
 | `populate_registers.py` | CSV as-is, masked | none — local files |
 | `populate_claude_project.py` | one INDEX row per doc, body to `_records\` | none — local files |
 
+**Name your mailboxes once:** `populate_gmail.py --accounts a@x.com,b@y.com`. Without it the script
+falls back to "an address on ≥5 % of threads is one of ours", and over the real 245-thread snapshot
+that promoted a frequent *correspondent* to an account folder. `COUNTS.json` records which one
+decided, as `accounts_source: declared | inferred`.
+
 **Two of the six never needed a chat at all.** `registers` and `claude-project` are local files and
 run live on this laptop today, key or no key.
 
