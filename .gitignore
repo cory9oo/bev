@@ -1,3 +1,10 @@
 # Nothing generated lives here. The board is fetched at runtime from the private repo.
 node_modules/
 tests/live_board.json
+
+# Python bytecode - a build artifact, never source. WIRE BEV-POPULATE-1 P2 committed twelve of
+# these (`tools/__pycache__/*.pyc`, 53 KB of them) because `git add tools` sweeps whatever the
+# test run just built. master-brain's .gitignore carries the identical line for the identical
+# reason, logged at WIRE BEV-HOME-1 H5 - the second time is the one that earns the ignore rule.
+__pycache__/
+*.pyc
