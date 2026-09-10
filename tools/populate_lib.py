@@ -314,7 +314,8 @@ class Store:
 
     # -- closing out ----------------------------------------------------------------------
     def finish(self, at_origin: int, since: str | None, source: str, grain: str,
-               walls: list[str] | None = None, extra: dict | None = None) -> dict:
+               walls: list[str] | None = None, extra: dict | None = None,
+               notes: list[str] | None = None) -> dict:
         """`extra` is the store's own fields, and it goes in BEFORE the file is written.
 
         populate_gmail used to add `accounts` / `accounts_source` to the RETURNED dict, after
@@ -333,6 +334,14 @@ class Store:
             "source": source,
             "grain": grain,
             "walls": walls or [],
+            # A NOTE IS NOT A WALL, and conflating them made an idempotent second run read as a
+            # failure: "skipped issues.csv.pre-... (a backup)" landed in `walls`, `copied` was 0
+            # because nothing had changed, and populate_all duly announced
+            # "BUILT - NOT RUN LIVE: registers, claude-project" about two stores that had just
+            # run perfectly. A wall is a door this run could not open; a note is an item it chose
+            # not to file, and said why. An unattended daily report that cries wolf about two
+            # healthy stores is a report nobody reads by Thursday.
+            "notes": notes or list(self.notes),
             "oversize": self.oversize,
             "manifest_rows": len(self.manifest.rows),
         }
@@ -442,10 +451,13 @@ def report(counts: dict) -> str:
     files, and a receipt that compared 25 to 245 would read like a 90% loss. `held` is
     `manifest_rows`: how many RECORDS the store holds after the run. That is the number parity is
     measured on."""
-    walls = ("  WALL: " + "; ".join(counts["walls"])) if counts["walls"] else ""
+    tail = ("  WALL: " + "; ".join(counts["walls"])) if counts["walls"] else ""
+    n = len(counts.get("notes") or [])
+    if n and not tail:
+        tail = "  (%d skipped, named)" % n
     return ("%-16s origin %6s  held %6s  files %5s  unchanged %5s  failed %3s%s"
             % (counts["store"], counts["at_origin"], counts.get("manifest_rows", 0),
-               counts["copied"], counts["skipped"], counts["failed"], walls))
+               counts["copied"], counts["skipped"], counts["failed"], tail))
 
 
 def run_store(fn, *a, **kw) -> dict:
@@ -458,12 +470,12 @@ def run_store(fn, *a, **kw) -> dict:
         return fn(*a, **kw)
     except Wall as w:
         return {"store": getattr(fn, "STORE", "?"), "at_origin": 0, "copied": 0, "skipped": 0,
-                "failed": 0, "walls": [str(w)], "since": "", "ran_at": now_utc_z(),
+                "failed": 0, "walls": [str(w)], "notes": [], "since": "", "ran_at": now_utc_z(),
                 "ran_at_local": now_cdt(), "source": "none", "grain": "-", "oversize": [],
                 "manifest_rows": 0}
     except Exception as e:                                     # noqa: BLE001 - deliberate, see above
         return {"store": getattr(fn, "STORE", "?"), "at_origin": 0, "copied": 0, "skipped": 0,
-                "failed": 1, "walls": ["DEFECT %s: %s" % (type(e).__name__, e)], "since": "",
+                "failed": 1, "walls": ["DEFECT %s: %s" % (type(e).__name__, e)], "notes": [], "since": "",
                 "ran_at": now_utc_z(), "ran_at_local": now_cdt(), "source": "none", "grain": "-",
                 "oversize": [], "manifest_rows": 0}
 

@@ -54,11 +54,11 @@ def run(args) -> dict:
             # BEFORE the extension test, or a backup gets reported as "not a register format" -
             # true, but not the reason, and a reason that misleads is worse than none.
             if ".pre-" in name or name.endswith("~"):
-                walls.append("skipped %s (a backup, not a register)" % name)
+                st.notes.append("skipped %s (a backup, not a register)" % name)
                 continue
             ext = os.path.splitext(name)[1].lower()
             if ext not in TAKE:
-                walls.append("skipped %s (not a register format)" % name)
+                st.notes.append("skipped %s (not a register format)" % name)
                 continue
             with open(path, "rb") as fh:
                 raw = fh.read()

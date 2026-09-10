@@ -64,7 +64,7 @@ def main() -> int:
 
     if a.json:
         print(json.dumps(results, indent=2, sort_keys=True))
-    walled = [c["store"] for c in results if c.get("walls") and not c.get("copied")]
+    walled = [c["store"] for c in results if c.get("walls")]
     if walled:
         print("\nBUILT - NOT RUN LIVE: %s" % ", ".join(walled))
     # ASCII only. This runs unattended in a Windows console whose codepage turns a middot into a

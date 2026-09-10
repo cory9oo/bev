@@ -63,7 +63,7 @@ def run(args) -> dict:
         for name in names:
             stem, ext = os.path.splitext(name)
             if name in GMAIL_FILES or (ext == ".md" and GMAIL_THREAD.match(stem)):
-                walls.append("skipped %s (belongs to store gmail)" % name)
+                st.notes.append("skipped %s (belongs to store gmail)" % name)
                 continue
             path = os.path.join(src, name)
             with open(path, "rb") as fh:

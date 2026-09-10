@@ -60,6 +60,10 @@ def estate(tmp_path):
     (root / "life-taxonomy" / "registers" / "issues.csv.pre-bev-home-1-h5").write_text(
         "id,what\nISS-1,open\n", encoding="utf-8")
     (root / "life-taxonomy" / "registers" / "entities.yaml").write_text("a: 1\n", encoding="utf-8")
+    # The real registers dir holds two .md files that are not registers. The fixture carries one,
+    # so "skipped, not a register format" is exercised rather than assumed.
+    (root / "life-taxonomy" / "registers" / "systems_inventory.md").write_text(
+        "# not a register\n", encoding="utf-8")
     return root
 
 
@@ -230,14 +234,14 @@ def test_header_row_in_the_98_export_is_not_filed_as_a_thread(estate):
 
 def test_backup_registers_are_skipped_with_a_reason(estate):
     c = populate_registers.run(args_for(estate))
-    assert any("pre-bev-home-1-h5" in w for w in c["walls"])
+    assert any("pre-bev-home-1-h5" in n for n in c["notes"])
     assert not (estate / "master-brain" / "records" / "registers"
                 / "issues.csv.pre-bev-home-1-h5").exists()
 
 
 def test_gmail_files_are_not_filed_twice_by_claude_project(estate):
     c = populate_claude_project.run(args_for(estate, snapshot=str(estate / "Claude outputs")))
-    assert any("belongs to store gmail" in w for w in c["walls"])
+    assert any("belongs to store gmail" in n for n in c["notes"])
     bulk = estate / "master-brain" / "_records" / "claude-project"
     assert sorted(p.name for p in bulk.iterdir()) == ["C27.md", "D35.md"]
 
@@ -316,3 +320,22 @@ def test_store_specific_counts_reach_the_file_not_just_the_return(estate):
     on_disk = counts_of(estate, "gmail")
     assert on_disk["accounts"] == ["cory@own.com"]
     assert on_disk["accounts_source"] == "declared"
+
+
+def test_a_named_skip_is_a_note_not_a_wall(estate):
+    """REGRESSION. `skipped issues.csv.pre-... (a backup)` used to land in `walls`; on an
+    idempotent second run `copied` is 0, and populate_all then announced
+    "BUILT - NOT RUN LIVE: registers, claude-project" about two stores that had just run
+    perfectly. A wall is a door this run could not open; a note is an item it chose not to
+    file, and said why."""
+    c = populate_registers.run(args_for(estate))
+    assert c["walls"] == [], "a skipped backup is not a wall"
+    assert any("a backup, not a register" in n for n in c["notes"])
+    assert any("not a register format" in n for n in c["notes"])
+
+    p = populate_claude_project.run(args_for(estate, snapshot=str(estate / "Claude outputs")))
+    assert p["walls"] == []
+    assert any("belongs to store gmail" in n for n in p["notes"])
+
+    w = L.run_store(populate_clickup.run, args_for(estate))
+    assert w["walls"] and w["notes"] == [], "a missing credential IS a wall"
