@@ -159,10 +159,8 @@ def run(args) -> dict:
     for relpath, batch in sorted(by_month.items()):
         st.write_csv(relpath, HEADER, batch, key="thread_id")
 
-    counts = st.finish(at_origin, since, source, GRAIN, walls)
-    counts["accounts"] = sorted(ours)
-    counts["accounts_source"] = how
-    return counts
+    return st.finish(at_origin, since, source, GRAIN, walls,
+                     extra={"accounts": sorted(ours), "accounts_source": how})
 
 
 run.STORE = STORE

@@ -112,6 +112,8 @@ ID_COLS = ("sha256", "url", "body_path", "path", "source", "register", "doc_id")
 
 def is_id_col(name: str) -> bool:
     return name in ID_COLS or name.endswith("_id") or name == "id"
+
+
 _SECRET_RES = (
     re.compile(r"\b(sk-[A-Za-z0-9_\-]{16,})"),
     re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{16,})"),
@@ -312,7 +314,13 @@ class Store:
 
     # -- closing out ----------------------------------------------------------------------
     def finish(self, at_origin: int, since: str | None, source: str, grain: str,
-               walls: list[str] | None = None) -> dict:
+               walls: list[str] | None = None, extra: dict | None = None) -> dict:
+        """`extra` is the store's own fields, and it goes in BEFORE the file is written.
+
+        populate_gmail used to add `accounts` / `accounts_source` to the RETURNED dict, after
+        finish() had already written COUNTS.json - so the runner printed them and the container
+        never held them. A count that exists only in a terminal that has scrolled away is not a
+        count; §CONTRACT 4 says the store records what it did."""
         counts = {
             "store": self.name,
             "at_origin": at_origin,
@@ -328,6 +336,7 @@ class Store:
             "oversize": self.oversize,
             "manifest_rows": len(self.manifest.rows),
         }
+        counts.update(extra or {})
         if not self.dry_run:
             self.manifest.save()
             _write_if_changed(os.path.join(self.records, "COUNTS.json"),

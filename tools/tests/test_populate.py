@@ -305,3 +305,14 @@ def test_declared_accounts_beat_the_frequency_fallback(estate):
     # is left on disk (nothing is ever deleted - DEC-037); what matters is that no NEW thread
     # lands under a correspondent's name once the operator has said what the mailboxes are.
     assert "cory@own.com" in [p.name for p in root.iterdir() if p.is_dir()]
+
+
+def test_store_specific_counts_reach_the_file_not_just_the_return(estate):
+    """REGRESSION. gmail added `accounts` to the RETURNED dict after finish() had already written
+    COUNTS.json, so the runner printed them and the container never held them. A count that lives
+    only in a terminal that has scrolled away is not a count."""
+    populate_gmail.run(args_for(estate, snapshot=str(estate / "Claude outputs"),
+                                accounts="cory@own.com"))
+    on_disk = counts_of(estate, "gmail")
+    assert on_disk["accounts"] == ["cory@own.com"]
+    assert on_disk["accounts_source"] == "declared"
