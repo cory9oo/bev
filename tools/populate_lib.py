@@ -379,10 +379,28 @@ class Store:
         counts.update(extra or {})
         if not self.dry_run:
             self.manifest.save()
+            # NO CHURN (R70.331, PASTE 115). If everything but the clock matches the file on disk,
+            # the file keeps its stamp: `ran_at` means the last run that CHANGED the store, and a
+            # run that changed nothing rewrites nothing - COUNTS.json and INDEX.md (whose dates come
+            # from the stamp) stay byte-identical. The caller still gets THIS run's time back.
+            on_disk = self._counts_on_disk()
+            stamp_keys = ("ran_at", "ran_at_local")
+            written = counts
+            if on_disk and {k: v for k, v in on_disk.items() if k not in stamp_keys} == \
+                    {k: v for k, v in counts.items() if k not in stamp_keys}:
+                written = dict(counts, **{k: on_disk.get(k, counts[k]) for k in stamp_keys})
             _write_if_changed(os.path.join(self.records, "COUNTS.json"),
-                              json.dumps(counts, indent=2, sort_keys=True) + "\n")
-            _write_if_changed(os.path.join(self.records, "INDEX.md"), self._index_md(counts))
+                              json.dumps(written, indent=2, sort_keys=True) + "\n")
+            _write_if_changed(os.path.join(self.records, "INDEX.md"), self._index_md(written))
         return counts
+
+    def _counts_on_disk(self):
+        try:
+            with open(os.path.join(self.records, "COUNTS.json"), encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else None
+        except (OSError, ValueError):
+            return None
 
     def _index_md(self, counts: dict) -> str:
         """ONE note per store, and it is the ONE catalog row per store (the T3 ruling).

@@ -416,3 +416,32 @@ def test_without_bev_container_the_layout_rule_stands(tmp_path, monkeypatch):
     est = tmp_path / "BEV"; est.mkdir(); (est / "CATALOG.md").write_text("x", encoding="utf-8")
     monkeypatch.delenv("BEV_CONTAINER", raising=False)
     assert L.container_root(str(est)) == str(est)
+
+
+# --- PASTE 115 (R70.331 "no churn"): a run that changed nothing rewrites nothing -------------------
+# finish() stamped ran_at into COUNTS.json - and INDEX.md's created/updated/last_refreshed come
+# from it - so every no-op run rewrote both files for every store: a commit per store per run that
+# changed only a clock. Measured 2026-09-10 21:36 on registers and claude-project (0 records copied,
+# 4 files rewritten). The stamp now means "the last run that CHANGED the store".
+def test_a_run_that_changed_nothing_leaves_counts_and_index_byte_identical(estate, monkeypatch):
+    monkeypatch.setattr(L, "now_utc_z", lambda: "2026-09-10T19:08:30Z")
+    monkeypatch.setattr(L, "now_cdt", lambda: "2026-09-10 14:08 CDT")
+    L.Store("registers", str(estate)).finish(20, None, "local", "g")
+    rec = estate / "master-brain" / "records" / "registers"
+    before = {f: (rec / f).read_bytes() for f in ("COUNTS.json", "INDEX.md")}
+    monkeypatch.setattr(L, "now_utc_z", lambda: "2026-09-11T02:36:52Z")
+    monkeypatch.setattr(L, "now_cdt", lambda: "2026-09-10 21:36 CDT")
+    out = L.Store("registers", str(estate)).finish(20, None, "local", "g")
+    assert {f: (rec / f).read_bytes() for f in before} == before
+    assert out["ran_at"] == "2026-09-11T02:36:52Z"          # the caller still hears THIS run's time
+
+
+def test_a_run_that_changed_something_takes_the_new_stamp(estate, monkeypatch):
+    monkeypatch.setattr(L, "now_utc_z", lambda: "2026-09-10T19:08:30Z")
+    monkeypatch.setattr(L, "now_cdt", lambda: "2026-09-10 14:08 CDT")
+    L.Store("registers", str(estate)).finish(20, None, "local", "g")
+    monkeypatch.setattr(L, "now_utc_z", lambda: "2026-09-11T02:36:52Z")
+    monkeypatch.setattr(L, "now_cdt", lambda: "2026-09-10 21:36 CDT")
+    L.Store("registers", str(estate)).finish(21, None, "local", "g")            # one more at origin
+    counts = json.loads((estate / "master-brain" / "records" / "registers" / "COUNTS.json").read_text(encoding="utf-8"))
+    assert counts["at_origin"] == 21 and counts["ran_at"] == "2026-09-11T02:36:52Z"
