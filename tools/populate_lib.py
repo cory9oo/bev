@@ -156,7 +156,14 @@ def container_root(estate: str) -> str:
     """The container in either layout (R70.345, 2026-09-10): the BEV root itself once it holds
     CATALOG.md, `<BEV>/master-brain` before. The `master-brain` shim that keeps the old path alive
     never carried `_records/` and is removed on 2026-10-10 - a join onto that name files into an
-    empty folder nobody reads."""
+    empty folder nobody reads.
+
+    BEV_CONTAINER (PASTE 115, R70.331) overrides it, and only it. A copier running under a lease
+    writes into its container WORKTREE while its sources, keys and the bus stay in the estate; one
+    `--estate` cannot say both once the estate and the container are the same folder."""
+    over = os.environ.get("BEV_CONTAINER")
+    if over:
+        return os.path.abspath(over)
     if os.path.isfile(os.path.join(estate, "CATALOG.md")):
         return estate
     return os.path.join(estate, "master-brain")

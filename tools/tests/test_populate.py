@@ -396,3 +396,23 @@ def test_the_estate_is_found_from_a_worktree_in_the_new_layout(new_estate, monke
     deep.mkdir(parents=True)
     monkeypatch.setattr(L, "__file__", str(deep / "populate_lib.py"))
     assert os.path.normcase(L.estate_root()) == os.path.normcase(str(new_estate))
+
+
+# --- PASTE 115 (R70.331): records follow the LEASE, sources stay in the ESTATE ----------------------
+# After R70.345 the BEV root is both the estate (sources, keys, the bus) and the container (records).
+# A copier running under a lease must write into its container WORKTREE, never main - but pointing
+# --estate at the worktree would also send the source lookups (life-taxonomy, keys) into a tree that
+# does not hold them. BEV_CONTAINER splits the two, and only the two.
+def test_bev_container_redirects_records_and_nothing_else(tmp_path, monkeypatch):
+    est = tmp_path / "BEV"; est.mkdir(); (est / "CATALOG.md").write_text("x", encoding="utf-8")
+    (est / "_machine" / "life-taxonomy").mkdir(parents=True)
+    wt = tmp_path / "wt"; wt.mkdir()
+    monkeypatch.setenv("BEV_CONTAINER", str(wt))
+    assert L.container_root(str(est)) == str(wt)
+    assert L.estate_path(str(est), "life-taxonomy") == str(est / "_machine" / "life-taxonomy")
+
+
+def test_without_bev_container_the_layout_rule_stands(tmp_path, monkeypatch):
+    est = tmp_path / "BEV"; est.mkdir(); (est / "CATALOG.md").write_text("x", encoding="utf-8")
+    monkeypatch.delenv("BEV_CONTAINER", raising=False)
+    assert L.container_root(str(est)) == str(est)
