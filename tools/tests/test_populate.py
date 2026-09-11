@@ -355,3 +355,44 @@ def test_a_walled_store_still_writes_its_counts(estate):
     idx = (estate / "master-brain" / "records" / "clickup" / "INDEX.md").read_text(encoding="utf-8")
     assert "BRAIN-RECORDS-CLICKUP" in idx and "NOT RUN LIVE" in idx
     assert c["failed"] == 0
+
+
+# ---------------------------------------------------------------------------------------------
+# R70.345 (WIRE 120, 2026-09-10) - THE BEV IS THE CONTAINER. The drawers moved up to the BEV root,
+# life-taxonomy and `Claude outputs` moved under _machine/, and `master-brain/` became a 30-day shim
+# of junctions that never carried `_records/`. The same populate must land in the same drawers.
+# ---------------------------------------------------------------------------------------------
+@pytest.fixture
+def new_estate(estate):
+    """The fixture estate, rearranged exactly as restructure.py rearranged the laptop."""
+    import shutil
+    (estate / "CATALOG.md").write_text("# CATALOG\n", encoding="utf-8")
+    (estate / "_machine").mkdir()
+    shutil.move(str(estate / "life-taxonomy"), str(estate / "_machine" / "life-taxonomy"))
+    shutil.move(str(estate / "Claude outputs"), str(estate / "_machine" / "Claude outputs"))
+    (estate / "master-brain").rmdir()
+    return estate
+
+
+def test_the_new_layout_files_into_the_bev_root_drawers(new_estate):
+    assert L.container_root(str(new_estate)) == str(new_estate)
+    c = populate_registers.run(args_for(new_estate))
+    assert c["copied"] > 0
+    assert (new_estate / "records" / "registers").is_dir()
+    assert not (new_estate / "master-brain").exists(), "nothing may be filed through the old name"
+    cp = populate_claude_project.run(args_for(new_estate))
+    assert cp["copied"] > 0, "Claude outputs is found under _machine/ now"
+
+
+def test_the_bulk_shelf_is_the_containers_not_the_shims(new_estate):
+    st = L.Store("gmail", str(new_estate))
+    st.write_text("huge.csv", "x" * (L.MAX_GIT_BYTES + 1))
+    assert (new_estate / "_records" / "gmail" / "huge.csv").exists()
+
+
+def test_the_estate_is_found_from_a_worktree_in_the_new_layout(new_estate, monkeypatch):
+    monkeypatch.delenv("BEV_ROOT", raising=False)
+    deep = new_estate / "_machine" / "_wt" / "bev--X" / "tools"
+    deep.mkdir(parents=True)
+    monkeypatch.setattr(L, "__file__", str(deep / "populate_lib.py"))
+    assert os.path.normcase(L.estate_root()) == os.path.normcase(str(new_estate))

@@ -26,7 +26,7 @@ import sys
 import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from populate_lib import estate_root, load_env, now_cdt          # noqa: E402
+from populate_lib import estate_root, estate_path, load_env, now_cdt          # noqa: E402
 from composio_client import Composio, PROBES                     # noqa: E402
 
 PROMPT_TIMEOUT = 120
@@ -44,7 +44,7 @@ FALLBACKS = [
 
 
 def env_path(estate: str) -> str:
-    return os.path.join(estate, "_reconcile", ".env")
+    return os.path.join(estate_path(estate, "_reconcile"), ".env")
 
 
 def ask_hidden(label: str, timeout: int = PROMPT_TIMEOUT) -> str | None:

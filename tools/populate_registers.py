@@ -21,6 +21,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from populate_lib import estate_path                                     # noqa: E402
 from populate_lib import (Store, Wall, sha256, since_of, ResumeStop,      # noqa: E402
                           main_wrapper, in_window)
 
@@ -31,7 +32,7 @@ TAKE = (".csv", ".yaml", ".yml", ".tsv")
 
 
 def source_dir(estate: str, override: str | None) -> str:
-    d = override or os.path.join(estate, "life-taxonomy", "registers")
+    d = override or os.path.join(estate_path(estate, "life-taxonomy"), "registers")
     if not os.path.isdir(d):
         raise Wall("no registers directory at %s" % d)
     return d

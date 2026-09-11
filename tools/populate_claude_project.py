@@ -22,6 +22,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from populate_lib import estate_path                                     # noqa: E402
 from populate_lib import (Store, Wall, sha256, since_of, ResumeStop, in_window,   # noqa: E402
                           main_wrapper)
 
@@ -35,7 +36,7 @@ TEXTY = (".md", ".txt", ".tsv", ".csv", ".json", ".yaml", ".yml", ".py", ".html"
 
 
 def source_dir(estate: str, override: str | None) -> str:
-    d = override or os.path.join(estate, "Claude outputs")
+    d = override or estate_path(estate, "Claude outputs")
     if not os.path.isdir(d):
         raise Wall("no Claude outputs directory at %s" % d)
     return d

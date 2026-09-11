@@ -60,7 +60,10 @@ def estate_root(explicit: str | None = None) -> str:
         return os.path.abspath(os.environ["BEV_ROOT"])
     here = os.path.abspath(os.path.dirname(__file__))
     while True:
-        if all(os.path.isdir(os.path.join(here, d)) for d in ("_reconcile", "master-brain")):
+        # R70.345: the BEV root IS the container now (CATALOG.md beside the bus); master-brain/ before
+        if os.path.isdir(os.path.join(here, "_reconcile")) and (
+                os.path.isfile(os.path.join(here, "CATALOG.md"))
+                or os.path.isdir(os.path.join(here, "master-brain"))):
             return here
         parent = os.path.dirname(here)
         if parent == here:
@@ -149,8 +152,29 @@ def scrub(text: str) -> str:
 # prints a value, never logs one, and never puts one in an exception message - a traceback is a
 # log line with extra steps.
 # ---------------------------------------------------------------------------------------------
+def container_root(estate: str) -> str:
+    """The container in either layout (R70.345, 2026-09-10): the BEV root itself once it holds
+    CATALOG.md, `<BEV>/master-brain` before. The `master-brain` shim that keeps the old path alive
+    never carried `_records/` and is removed on 2026-10-10 - a join onto that name files into an
+    empty folder nobody reads."""
+    if os.path.isfile(os.path.join(estate, "CATALOG.md")):
+        return estate
+    return os.path.join(estate, "master-brain")
+
+
+def estate_path(estate: str, name: str) -> str:
+    """A top-level estate folder in either layout: `<BEV>/_machine/<name>` after R70.345 (life-taxonomy,
+    `Claude outputs`, and the bus once finish_restructure.ps1 moves it), `<BEV>/<name>` before."""
+    for d in (os.path.join(estate, "_machine", name), os.path.join(estate, name)):
+        if os.path.exists(d):
+            return d
+    if os.path.isfile(os.path.join(estate, "CATALOG.md")):
+        return os.path.join(estate, "_machine", name)
+    return os.path.join(estate, name)
+
+
 def load_env(estate: str) -> dict:
-    path = os.path.join(estate, "_reconcile", ".env")
+    path = os.path.join(estate_path(estate, "_reconcile"), ".env")
     out = {}
     if not os.path.exists(path):
         return out
@@ -230,8 +254,8 @@ class Store:
         self.name = name
         self.estate = estate
         self.dry_run = dry_run
-        self.records = os.path.join(estate, "master-brain", "records", name)
-        self.bulk = os.path.join(estate, "master-brain", "_records", name)
+        self.records = os.path.join(container_root(estate), "records", name)
+        self.bulk = os.path.join(container_root(estate), "_records", name)
         self.manifest = Manifest(os.path.join(self.records, "MANIFEST.tsv"))
         self.written = 0
         self.skipped = 0
